@@ -1,0 +1,87 @@
+# Forward-test odds capture — Modelo de Predicciones de Fútbol
+#
+# Runs forward_test.py on GitHub Actions (free tier) and commits the
+# snapshots back to this repo. $0 cost: GitHub Actions free tier is
+# 2,000 minutes/month; these two jobs use ~5 minutes/day.
+#
+# TIMEZONE: America/Caracas is UTC-04:00 all year (no daylight saving),
+# so 10:00 Caracas = 14:00 UTC, and matches run roughly 15:00-02:00 UTC.
+#
+# SETUP (Daniel must do this once — Muse cannot create the repo or the
+# secret for him; see FORWARD-TEST.md):
+#   1. Create a GitHub repo and push these files to the repo root.
+#   2. Repo -> Settings -> Secrets and variables -> Actions -> New
+#      repository secret, name: API_FOOTBALL_KEY, value: the free key
+#      from dashboard.api-football.com (no credit card).
+#   3. Done. The workflows below run automatically from then on.
+#
+# No key in this file, no key in the code — the key lives only as a
+# repository secret and reaches the script as an environment variable.
+
+name: forward-test
+
+on:
+  schedule:
+    # Morning capture: 10:00 America/Caracas = 14:00 UTC.
+    - cron: "0 14 * * *"
+    # Closing capture: every 30 min while matches are played,
+    # 15:00-23:30 UTC and 00:00-02:00 UTC. The script itself only
+    # fetches matches kicking off in the next 60 minutes, so most
+    # runs make 0 requests and exit immediately.
+    - cron: "*/30 15-23 * * *"
+    - cron: "*/30 0-2 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Capture to run manually"
+        type: choice
+        options: [morning, closing]
+        default: morning
+
+permissions:
+  contents: write
+
+jobs:
+  morning:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 14 * * *'
+      || github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'morning'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Morning odds capture (10:00 Caracas)
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        run: |
+          python forward_test.py --mode morning
+      - name: Commit snapshots
+        run: |
+          git config user.name "forward-test-bot"
+          git config user.email "forward-test-bot@users.noreply.github.com"
+          git add data/forward_test/
+          git diff --cached --quiet || git commit -m "forward-test: morning odds $(date -u +%F)"
+          git push
+
+  closing:
+    if: github.event_name == 'schedule' && github.event.schedule != '0 14 * * *'
+      || github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'closing'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Closing odds capture (matches kicking off soon)
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        run: |
+          python forward_test.py --mode closing
+      - name: Commit snapshots
+        run: |
+          git config user.name "forward-test-bot"
+          git config user.email "forward-test-bot@users.noreply.github.com"
+          git add data/forward_test/
+          git diff --cached --quiet || git commit -m "forward-test: closing odds $(date -u +%F_%H%M)"
+          git push
