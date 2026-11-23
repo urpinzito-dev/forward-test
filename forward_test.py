@@ -300,6 +300,21 @@ def todays_fixtures(client, date_str):
     return out
 
 
+def _flatten_bets(bookmakers):
+    """Flatten API-Football's bookmakers list into a plain bets list.
+
+    The API returns bookmakers -> bets -> values. The odds parsers
+    below expect a flat list of bet dicts (each with 'name'/'values'),
+    so passing the raw bookmakers list matches nothing and every
+    market comes back empty. This was the 2026-11-20/21 bug: 0/160
+    odds despite the markets existing in the feed.
+    """
+    bets = []
+    for bk in bookmakers or []:
+        bets.extend(bk.get("bets") or [])
+    return bets
+
+
 def fetch_odds_bulk(client, date_str):
     """One /odds?date= call for the whole day. Returns
     {fixture_id: bets} or None if the endpoint does not support it."""
@@ -309,7 +324,7 @@ def fetch_odds_bulk(client, date_str):
     out = {}
     for item in data.get("response", []):
         fid = str(item.get("fixture", {}).get("id"))
-        out[fid] = item.get("bookmakers", [])
+        out[fid] = _flatten_bets(item.get("bookmakers", []))
     return out
 
 
@@ -317,7 +332,7 @@ def fetch_odds_fixture(client, fixture_id):
     data = client.get(f"/odds?fixture={fixture_id}")
     if not data or not data.get("response"):
         return []
-    return data["response"][0].get("bookmakers", [])
+    return _flatten_bets(data["response"][0].get("bookmakers", []))
 
 
 # ------------------------------------------------------------------ modes
