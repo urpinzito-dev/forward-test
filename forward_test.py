@@ -85,9 +85,17 @@ OUT_DIR = os.path.join(BASE, "data", "forward_test")
 CARACAS = ZoneInfo("America/Caracas") if ZoneInfo else timezone(timedelta(hours=-4))
 
 API_FOOTBALL_BASE = "https://v3.football.api-sports.io"
-# API-Football league ids for the 10 leagues in the model (verified in
-# SOURCES-AUDIT.md as the league-id mapping to use; re-check at signup).
+# API-Football league ids for Daniel's 43 competitions (2026-11-20 list).
+# Verified live against API-Football on 2026-11-24 (fixtures/search/id
+# lookups, before the free account hit its daily limit): 38 of 43 have
+# a verified id and are included below. NOT included — no verified
+# API-Football id found, so do NOT guess one (a wrong id would silently
+# drop that competition): AFC Asian Cup, Eliminatorias Mundial (the list
+# does not say which region's qualifiers), Concachampions, Finalissima,
+# Copa Interamericana (defunct; likely not in API-Football at all).
+# Re-verify those 5 tomorrow when the daily quota resets, then add them.
 LEAGUES = {
+    # Europe — 14 leagues
     39: "E0",    # Premier League
     140: "SP1",  # LaLiga
     135: "I1",   # Serie A
@@ -98,6 +106,35 @@ LEAGUES = {
     203: "T1",   # Super Lig
     144: "B1",   # Jupiler Pro League
     197: "G1",   # Super League 1 (Greece)
+    218: "AUT",  # Bundesliga (Austria)
+    106: "POL",  # Ekstraklasa
+    103: "NOR",  # Eliteserien
+    113: "SWE",  # Allsvenskan
+    # America — 8 leagues (Argentina Apertura/Clausura share one dataset)
+    299: "VEN",  # Liga FutVe
+    71: "BRA",   # Serie A (Brazil)
+    253: "MLS",  # MLS
+    128: "ARG",  # Liga Profesional (Apertura + Clausura)
+    262: "MEX",  # Liga MX (Apertura + Clausura)
+    242: "ECU",  # LigaPro Serie A
+    281: "PER",  # Liga 1 (Apertura + Clausura)
+    # Cups / competitions — 16 verified
+    2: "UCL",    # UEFA Champions League
+    3: "UEL",    # UEFA Europa League
+    848: "UECL", # UEFA Conference League
+    1: "WC",     # Mundial
+    10: "FR",    # Amistosos Internacionales
+    9: "CA",     # Copa America
+    22: "GC",    # Copa Oro Concacaf
+    4: "EURO",   # Eurocopa
+    5: "UNL",    # Nations League
+    6: "AFCON",  # Copa Africana de Naciones
+    13: "LIB",   # Copa Libertadores
+    11: "SUD",   # Copa Sudamericana
+    531: "USC",  # Supercopa UEFA
+    541: "REC",  # Recopa Sudamericana
+    772: "LEAG", # Leagues Cup
+    15: "CWC",   # Mundial de Clubes
 }
 FOCUS_MARKETS = [
     "corners_away_over45",
@@ -279,7 +316,7 @@ def load_model_probs(date_str):
 
 
 def todays_fixtures(client, date_str):
-    """All of today's fixtures in the 10 modelled leagues."""
+    """All of today's fixtures in the modelled competitions."""
     data = client.get(
         f"/fixtures?date={date_str}&timezone=America/Caracas")
     if not data:
@@ -339,7 +376,7 @@ def fetch_odds_fixture(client, fixture_id):
 def run_morning(client, date_str, dry_run):
     print(f"Morning capture — {date_str} (10:00 America/Caracas)")
     fixtures = todays_fixtures(client, date_str)
-    print(f"  fixtures today in the 10 leagues: {len(fixtures)}")
+    print(f"  fixtures today in the modelled competitions: {len(fixtures)}")
     if not fixtures:
         print("  no fixtures — nothing to capture")
         return
